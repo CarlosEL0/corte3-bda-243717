@@ -13,15 +13,25 @@ CREATE OR REPLACE PROCEDURE sp_agendar_cita(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- Manejo básico de NULLs para evitar fallos en producción
+    -- 1. Validaciones (Manejo de NULLs)
     IF p_mascota_id IS NULL OR p_veterinario_id IS NULL OR p_fecha_hora IS NULL THEN
         RAISE EXCEPTION 'Los campos mascota, veterinario y fecha son obligatorios.';
 END IF;
 
-    -- Inserción segura (parametrizada automáticamente por plpgsql)
+    -- 2. Inserción segura
 INSERT INTO citas (mascota_id, veterinario_id, fecha_hora, motivo, estado)
 VALUES (p_mascota_id, p_veterinario_id, p_fecha_hora, p_motivo, 'AGENDADA')
     RETURNING id INTO p_cita_id;
+
+-- 3. Confirmar transacción
+COMMIT;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- 4. Revertir cambios en caso de cualquier error relacional o de constraints
+        ROLLBACK;
+        -- 5. Relanzar el error para que el backend (Spring Boot) se entere y no falle silenciosamente
+        RAISE EXCEPTION 'Error al agendar cita: %', SQLERRM;
 END;
 $$;
 
@@ -36,19 +46,17 @@ DECLARE
 v_total_citas NUMERIC := 0;
     v_total_vacunas NUMERIC := 0;
 BEGIN
-    -- Sumar costo de citas completadas
 SELECT COALESCE(SUM(costo), 0) INTO v_total_citas
 FROM citas
-WHERE mascota_id = p_mascota_id
-  AND EXTRACT(YEAR FROM fecha_hora) = p_anio
-  AND estado = 'COMPLETADA';
+WHERE mascota_id = p_mascota_id AND EXTRACT(YEAR FROM fecha_hora) = p_anio AND estado = 'COMPLETADA';
 
--- Sumar costo de vacunas aplicadas
 SELECT COALESCE(SUM(costo_cobrado), 0) INTO v_total_vacunas
 FROM vacunas_aplicadas
-WHERE mascota_id = p_mascota_id
-  AND EXTRACT(YEAR FROM fecha_aplicacion) = p_anio;
+WHERE mascota_id = p_mascota_id AND EXTRACT(YEAR FROM fecha_aplicacion) = p_anio;
 
 RETURN v_total_citas + v_total_vacunas;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'Error al calcular la facturación: %', SQLERRM;
 END;
 $$;
