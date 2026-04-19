@@ -1,0 +1,33 @@
+# api/src/main/resources/application.yml
+spring:
+  application:
+    name: veterinaria-api
+
+  # Conexión a PostgreSQL (leyendo las variables de tu .env)
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5442}/${POSTGRES_DB:clinica_veterinaria}
+    username: ${POSTGRES_USER:admin_vet}
+    password: ${POSTGRES_PASSWORD:super_secret_password_123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # IMPORTANTE: "validate" asegura que Spring NO modifique tus tablas,
+    # respetando el schema y las políticas RLS que ya creaste en SQL.
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Conexión a Redis
+  data:
+    redis:
+      host: localhost
+      port: ${REDIS_PORT:6389}
+
+server:
+  port: ${API_PORT:8090}
+  error:
+    # DEFENSA DE SEGURIDAD: Nunca enviar stack traces de errores al cliente
+    include-stacktrace: never
