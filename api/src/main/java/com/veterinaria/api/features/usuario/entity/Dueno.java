@@ -24,7 +24,7 @@ public class Dueno {
     private String email;
 
     @Column (nullable = false, length = 20)
-    private int telefino;
+    private String telefono;
 
 
 }
